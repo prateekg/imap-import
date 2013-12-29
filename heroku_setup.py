@@ -3,9 +3,6 @@
 `setup_accounts.py` must already have been run."""
 
 import subprocess
-import json
-import threading
-import mailbox
 import load
 import getpass
 import imaplib2

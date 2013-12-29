@@ -1,7 +1,6 @@
 import imaplib2
 import time
-import getpass
-from email.parser import Parser
+from email.parser import HeaderParser
 import os
 
 class Mailbox(object):
@@ -25,7 +24,7 @@ class Mailbox(object):
         self._label = label
         self._x_gmail_fetch_info = x_gmail_fetch_info
 
-        self.parser = Parser()
+        self._parser = HeaderParser()
         self._login()
 
     def _login(self):
@@ -58,13 +57,19 @@ class Mailbox(object):
         behavior within Gmail's IMAP settings). Logs out of this mailbox before
         exiting.
         """
+        retry = False
         try:
             while True:
                 msgs = self._m.search(None, 'ALL')[1][0]
                 if msgs != '':
                     for msg in msgs.split(' '):
-                        raw = self._m.fetch(msg, '(RFC822)')[1][0][1]
-                        parsed_msg = self.parser.parsestr(raw)
+                        typ, data = self._m.fetch('1', '(RFC822)') # Message will always be the first one since we archive previous messages as we go
+                        if typ != 'OK' or data[0] is None:
+                            print 'Could not get a message for account ' + self._username + ':' + self._host + ', will try again'
+                            retry = True
+                            break
+                        raw = data[0][1]
+                        parsed_msg = self._parser.parsestr(raw)
                         if self._x_gmail_fetch_info != '':
                             raw = 'X-Gmail-Fetch-Info: ' + self._x_gmail_fetch_info + '\r\n' + raw
 
@@ -83,10 +88,12 @@ class Mailbox(object):
                             new_msg = m_to._m.search(None, 'Header', 'Message-ID', msg_id)[1][0]
                             m_to._m.store(new_msg, '+X-GM-LABELS', self._label)
                         # Archive from self._m
-                        self._m.store(msg, '+FLAGS', '(\Deleted)')
+                        self._m.store('1', '+FLAGS', '(\Deleted)')
                         self._m.expunge()
                 try:
-                    self._m.idle(timeout=24*60)
+                    if not retry:
+                        self._m.idle(timeout=24*60)
+                    retry = False
                 except:
                     time.sleep(5)
                     self._login()

@@ -2,7 +2,6 @@
 
 Everything must already be set up properly for this to work."""
 
-import json
 import threading
 import mailbox
 import load
@@ -16,6 +15,7 @@ threads = []
 for account_from in accounts['m_froms']:
     m_from = mailbox.Mailbox(**account_from)
     t = threading.Thread(target=mailbox.Mailbox.idle, args=(m_from, m_to))
+    t.daemon = True
     t.start()
     threads.append(t)
 
